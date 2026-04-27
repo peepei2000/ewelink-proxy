@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gesture + Clap Light Control</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0a0f;--surface:#13131a;--border:#1e1e2a;--text:#e8e8f0;--dim:#6b6b80;
+    --accent:#fbbf24;--accent-glow:rgba(251,191,36,0.3);--off-color:#2a2a35;
+    --on-color:#fbbf24;--danger:#ef4444;--success:#22c55e;
+  }
+  body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .app{max-width:1200px;margin:0 auto;padding:1.5rem}
+  header{text-align:center;margin-bottom:1.5rem}
+  header h1{font-size:1.8rem;font-weight:900;letter-spacing:-1px;background:linear-gradient(135deg,#fbbf24,#f59e0b,#fcd34d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.2rem}
+  header p{color:var(--dim);font-size:.85rem;font-weight:300}
+
+  .tabs{display:flex;margin-bottom:1.5rem;background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden}
+  .tab{flex:1;padding:.7rem;text-align:center;font-size:.85rem;font-weight:600;cursor:pointer;background:transparent;border:none;color:var(--dim);transition:.3s;font-family:'Outfit',sans-serif}
+  .tab.active{background:rgba(251,191,36,.1);color:var(--accent)}
+  .tab:hover:not(.active){color:var(--text)}
+  .tab-content{display:none}.tab-content.active{display:block}
+
+  /* Config */
+  .config-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem}
+  .config-title{font-size:1.1rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+  .form-group{margin-bottom:1rem}
+  .form-group label{display:block;font-size:.75rem;font-weight:600;color:var(--dim);margin-bottom:.4rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px}
+  .form-group input,.form-group select{width:100%;padding:.7rem .9rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.85rem;outline:none;transition:border-color .3s}
+  .form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  .btn{padding:.75rem 1.5rem;font-family:'Outfit',sans-serif;font-size:.9rem;font-weight:700;border:none;border-radius:10px;cursor:pointer;transition:.3s}
+  .btn-primary{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#0a0a0f}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(251,191,36,.25)}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+  .status-msg{margin-top:.8rem;padding:.6rem .9rem;border-radius:8px;font-size:.8rem;font-family:'JetBrains Mono',monospace;display:none}
+  .status-msg.error{display:block;background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2)}
+  .status-msg.success{display:block;background:rgba(34,197,94,.1);color:var(--success);border:1px solid rgba(34,197,94,.2)}
+  .status-msg.info{display:block;background:rgba(251,191,36,.1);color:var(--accent);border:1px solid rgba(251,191,36,.2)}
+  .devices-list{margin-top:1rem}
+  .device-item{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;margin-bottom:.5rem;transition:.3s}
+  .device-item.selected{border-color:var(--accent);background:rgba(251,191,36,.05)}
+  .device-info{display:flex;align-items:center;gap:.8rem}
+  .device-online{width:8px;height:8px;border-radius:50%;background:var(--danger)}
+  .device-online.on{background:var(--success)}
+  .device-name{font-weight:600;font-size:.9rem}
+  .device-id{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--dim)}
+  .device-toggle{width:20px;height:20px;border-radius:4px;border:2px solid var(--border);background:transparent;cursor:pointer;transition:.3s;display:flex;align-items:center;justify-content:center}
+  .device-toggle.checked{border-color:var(--accent);background:var(--accent)}
+  .device-toggle.checked::after{content:'✓';color:#0a0a0f;font-size:.7rem;font-weight:900}
+  .help-text{font-size:.75rem;color:var(--dim);line-height:1.6;margin-top:1rem;padding:.8rem 1rem;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.1);border-radius:8px}
+  .help-text a{color:var(--accent);text-decoration:none}
+  .help-text strong{color:var(--text)}
+
+  /* Main Control */
+  .main-grid{display:grid;grid-template-columns:1.3fr .7fr;gap:1.5rem;align-items:start}
+  @media(max-width:768px){.main-grid{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}}
+
+  .camera-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  .camera-header{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.2rem;border-bottom:1px solid var(--border)}
+  .camera-header .label{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--dim);text-transform:uppercase;letter-spacing:2px}
+  .status-badge{display:flex;align-items:center;gap:6px;font-size:.7rem;font-family:'JetBrains Mono',monospace;padding:3px 8px;border-radius:20px;background:rgba(239,68,68,.15);color:var(--danger);transition:.3s}
+  .status-badge.active{background:rgba(34,197,94,.15);color:var(--success)}
+  .status-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse-dot 1.5s ease infinite}
+  @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .video-wrapper{position:relative;aspect-ratio:16/10;background:#000;overflow:hidden}
+  #webcam{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:none}
+  #canvas-main{width:100%;height:100%;display:block}
+  .overlay-badge{position:absolute;background:rgba(0,0,0,.7);border-radius:8px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:.65rem;z-index:5;pointer-events:none}
+  .zoom-badge{top:10px;right:10px;border:1px solid var(--border);color:var(--accent)}
+  .ewelink-badge{top:10px;left:10px;border:1px solid var(--success);color:var(--success)}
+
+  /* Audio Meter */
+  .audio-section{display:flex;align-items:center;gap:10px;padding:.6rem 1.2rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .mic-icon{font-size:1.2rem;flex-shrink:0}
+  .audio-meter-track{flex:1;height:6px;background:var(--off-color);border-radius:3px;overflow:hidden;position:relative}
+  .audio-meter-fill{height:100%;width:0%;border-radius:3px;transition:width .05s;background:var(--success)}
+  .audio-meter-fill.loud{background:var(--danger)}
+  .clap-indicator{display:flex;align-items:center;gap:6px}
+  .clap-dot{width:10px;height:10px;border-radius:50%;background:var(--off-color);transition:all .2s}
+  .clap-dot.hit{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+  .clap-label{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+
+  .gesture-display{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--border)}
+  .hand-status{padding:.8rem 1rem;display:flex;align-items:center;gap:.7rem}
+  .hand-status:first-child{border-right:1px solid var(--border)}
+  .hand-emoji{font-size:1.8rem}
+  .hand-info .hand-label{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+  .hand-info .hand-state{font-size:1rem;font-weight:700;transition:color .3s}
+  .btn-row{padding:0 1rem 1rem;display:flex;gap:.5rem}
+  .start-btn{flex:1;padding:.85rem;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;border:none;border-radius:10px;cursor:pointer;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#0a0a0f;transition:.3s}
+  .start-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(251,191,36,.25)}
+  .start-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .start-btn.running{background:linear-gradient(135deg,#ef4444,#dc2626);color:white}
+
+  .lights-panel{display:flex;flex-direction:column;gap:1rem}
+  .room-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.2rem;transition:all .5s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden}
+  .room-card::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,var(--accent-glow) 0%,transparent 60%);opacity:0;transition:opacity .6s;pointer-events:none}
+  .room-card.on::before{opacity:1}
+  .room-card.on{border-color:rgba(251,191,36,.3);box-shadow:0 0 30px rgba(251,191,36,.08)}
+  .room-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem;position:relative;z-index:1}
+  .room-name{font-weight:700;font-size:.95rem}
+  .bulb-icon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;background:var(--off-color);transition:.4s}
+  .room-card.on .bulb-icon{background:var(--on-color);box-shadow:0 0 16px var(--accent-glow)}
+  .room-bar{position:relative;z-index:1;height:3px;border-radius:3px;background:var(--off-color);overflow:hidden}
+  .room-bar-fill{height:100%;width:0%;background:var(--on-color);border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+  .room-card.on .room-bar-fill{width:100%}
+  .room-status{margin-top:.4rem;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--dim);position:relative;z-index:1;transition:color .4s}
+  .room-card.on .room-status{color:var(--accent)}
+
+  .api-log{margin-top:1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.8rem 1rem;max-height:120px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--dim);line-height:1.8;grid-column:1/-1}
+  .api-log .log-entry{border-bottom:1px solid var(--border);padding:2px 0}
+  .api-log .log-entry:last-child{border-bottom:none}
+  .log-on{color:var(--success)}.log-off{color:var(--danger)}.log-err{color:#f97316}.log-clap{color:var(--accent)}
+
+  .loading-overlay{position:absolute;inset:0;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;gap:.8rem}
+  .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-text{font-size:.8rem;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🤲👏 Gesture + Clap Light Control</h1>
+    <p>Ambas manos abiertas/cerradas · Doble aplauso toggle · Auto-zoom · eWeLink</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('config')">⚙️ Configuración</button>
+    <button class="tab" onclick="switchTab('control')">🎮 Control</button>
+  </div>
+
+  <!-- CONFIG TAB -->
+  <div class="tab-content active" id="tab-config">
+    <div class="config-panel">
+      <div class="config-title">⚙️ Conexión a eWeLink</div>
+      <div class="help-text">
+        Haz click en "Conectar con eWeLink" — se abre una ventana donde te logeas con tu cuenta eWeLink. No necesitas poner contraseña acá.
+      </div>
+      <div class="form-row" style="margin-top:1rem">
+        <div class="form-group"><label>App ID (dev.ewelink.cc)</label><input type="text" id="appId" placeholder="Tu AppID" value="2gXXPMsGai73CEDSnZmjqLWpscofYLgz"></div>
+        <div class="form-group"><label>App Secret</label><input type="password" id="appSecret" placeholder="Tu AppSecret"></div>
+      </div>
+      <div class="form-group">
+        <label>Región</label>
+        <select id="region"><option value="us">Americas (us)</option><option value="eu">Europa (eu)</option><option value="as">Asia (as)</option><option value="cn">China (cn)</option></select>
+      </div>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem">
+        <button class="btn btn-primary" id="btnConnect" onclick="startOAuth()">🔗 Conectar con eWeLink</button>
+        <button class="btn btn-outline" id="btnRefresh" onclick="refreshDevices()" style="display:none">Refrescar</button>
+      </div>
+      <div class="status-msg" id="configStatus"></div>
+      <div id="devicesSection" style="display:none;margin-top:1.5rem">
+        <div class="config-title">📱 Dispositivos — selecciona cuáles controlar</div>
+        <div class="devices-list" id="devicesList"></div>
+        <button class="btn btn-primary" style="margin-top:.8rem" onclick="saveAndGo()">Guardar y controlar →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROL TAB -->
+  <div class="tab-content" id="tab-control">
+    <div class="main-grid">
+      <div class="camera-panel">
+        <div class="camera-header">
+          <span class="label">Cámara + Audio</span>
+          <div class="status-badge" id="statusBadge"><span class="status-dot"></span><span id="statusText">Inactivo</span></div>
+        </div>
+        <div class="video-wrapper">
+          <video id="webcam" autoplay playsinline></video>
+          <canvas id="canvas-main"></canvas>
+          <div class="overlay-badge zoom-badge" id="zoomBadge" style="display:none">🔍 ZOOM <span id="zoomLevel">1.0</span>x</div>
+          <div class="overlay-badge ewelink-badge" id="ewelinkBadge" style="display:none">⚡ eWeLink</div>
+          <div class="loading-overlay" id="loadingOverlay" style="display:none"><div class="spinner"></div><span class="loading-text">Cargando modelo...</span></div>
+        </div>
+
+        <!-- Audio Meter -->
+        <div class="audio-section">
+          <div class="mic-icon">🎤</div>
+          <div class="audio-meter-track"><div class="audio-meter-fill" id="audioMeter"></div></div>
+          <div class="clap-indicator">
+            <div class="clap-dot" id="clapDot1"></div>
+            <div class="clap-dot" id="clapDot2"></div>
+            <span class="clap-label">Claps</span>
+          </div>
+        </div>
+
+        <div class="gesture-display">
+          <div class="hand-status"><div class="hand-emoji" id="leftEmoji">❓</div><div class="hand-info"><div class="hand-label">Mano Izq.</div><div class="hand-state" id="leftState">—</div></div></div>
+          <div class="hand-status"><div class="hand-emoji" id="rightEmoji">❓</div><div class="hand-info"><div class="hand-label">Mano Der.</div><div class="hand-state" id="rightState">—</div></div></div>
+        </div>
+        <div class="btn-row">
+          <button class="start-btn" id="startBtn" onclick="toggleCamera()">Iniciar Cámara + Mic</button>
+        </div>
+      </div>
+
+      <div class="lights-panel" id="lightsPanel">
+        <div style="color:var(--dim);font-size:.85rem;text-align:center;padding:2rem 1rem">Configura eWeLink primero en ⚙️<br><br>O prueba sin eWeLink — las luces virtuales igual funcionan.</div>
+      </div>
+
+      <div class="api-log" id="apiLog"><div class="log-entry" style="color:var(--dim)">— Log de eventos —</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.min.js"></script>
+
+<script>
+// ============================================================
+// CLAP DETECTION via Web Audio API
+// ============================================================
+let audioCtx, analyser, audioSource, audioData;
+let clapTimes = [];
+let lastClapTime = 0;
+const CLAP_THRESHOLD = 0.45;       // volume threshold to register a clap
+const CLAP_MIN_GAP = 150;          // ms minimum between two claps
+const CLAP_MAX_GAP = 800;          // ms maximum between two claps for double-clap
+const CLAP_COOLDOWN = 1200;        // ms cooldown after a double-clap triggers
+let clapCooldownUntil = 0;
+let lastPeakTime = 0;
+const PEAK_DURATION = 80;          // ms a peak must be isolated (not sustained noise)
+
+function initAudio(stream) {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.3;
+  audioSource = audioCtx.createMediaStreamSource(stream);
+  audioSource.connect(analyser);
+  audioData = new Uint8Array(analyser.frequencyBinCount);
+}
+
+function processAudio() {
+  if (!analyser) return;
+  analyser.getByteTimeDomainData(audioData);
+
+  // Calculate RMS volume
+  let sum = 0;
+  for (let i = 0; i < audioData.length; i++) {
+    const v = (audioData[i] - 128) / 128;
+    sum += v * v;
+  }
+  const rms = Math.sqrt(sum / audioData.length);
+  const volume = Math.min(rms * 3, 1); // normalize
+
+  // Update meter
+  const meter = document.getElementById('audioMeter');
+  meter.style.width = (volume * 100) + '%';
+  meter.classList.toggle('loud', volume > CLAP_THRESHOLD);
+
+  const now = Date.now();
+
+  // Detect sharp transient (clap-like)
+  if (volume > CLAP_THRESHOLD && now > clapCooldownUntil) {
+    if (now - lastPeakTime > PEAK_DURATION) {
+      // This is a new peak, not sustained noise
+      if (now - lastClapTime > CLAP_MIN_GAP) {
+        lastClapTime = now;
+        clapTimes.push(now);
+
+        // Show clap dots
+        if (clapTimes.length === 1) {
+          document.getElementById('clapDot1').classList.add('hit');
+        } else if (clapTimes.length >= 2) {
+          document.getElementById('clapDot2').classList.add('hit');
+        }
+
+        // Check for double clap
+        if (clapTimes.length >= 2) {
+          const gap = clapTimes[clapTimes.length - 1] - clapTimes[clapTimes.length - 2];
+          if (gap >= CLAP_MIN_GAP && gap <= CLAP_MAX_GAP) {
+            // DOUBLE CLAP DETECTED — toggle lights
+            clapCooldownUntil = now + CLAP_COOLDOWN;
+            clapTimes = [];
+            addLog('👏👏 Doble aplauso detectado — toggle luces', 'clap');
+            toggleLightsByClap();
+            setTimeout(() => {
+              document.getElementById('clapDot1').classList.remove('hit');
+              document.getElementById('clapDot2').classList.remove('hit');
+            }, 400);
+          }
+        }
+      }
+    }
+    lastPeakTime = now;
+  }
+
+  // Reset clap sequence if too much time passed
+  if (clapTimes.length > 0 && now - clapTimes[clapTimes.length - 1] > CLAP_MAX_GAP + 200) {
+    clapTimes = [];
+    document.getElementById('clapDot1').classList.remove('hit');
+    document.getElementById('clapDot2').classList.remove('hit');
+  }
+}
+
+function toggleLightsByClap() {
+  lightsOn = !lightsOn;
+  lastAction = lightsOn ? 'on' : 'off';
+  setAllDevices(lightsOn);
+}
+
+// ============================================================
+// eWeLink API (same as before)
+// ============================================================
+// CHANGE THIS to your Vercel deployment URL
+let PROXY_BASE = 'https://ewelink-proxy.vercel.app';
+
+let ewelinkToken=null,ewelinkApiKey=null,ewelinkRegion='us',ewelinkDevices=[],selectedDeviceIds=[];
+let lastCommandTime=0;const COMMAND_COOLDOWN=1500;
+
+function proxyUrl(apiPath){return `${PROXY_BASE}/api/proxy?region=${ewelinkRegion}&path=${encodeURIComponent(apiPath)}`}
+function setStatus(msg,type){const el=document.getElementById('configStatus');el.className='status-msg '+type;el.textContent=msg}
+function addLog(msg,type=''){const log=document.getElementById('apiLog');const e=document.createElement('div');e.className='log-entry'+(type?' log-'+type:'');e.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;log.appendChild(e);log.scrollTop=log.scrollHeight}
+
+async function hmacSign(secret,message){const enc=new TextEncoder();const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);const sig=await crypto.subtle.sign('HMAC',key,enc.encode(message));return btoa(String.fromCharCode(...new Uint8Array(sig)))}
+function generateNonce(){const c='abcdefghijklmnopqrstuvwxyz0123456789';let r='';for(let i=0;i<8;i++)r+=c[Math.floor(Math.random()*c.length)];return r}
+
+// OAuth2 flow
+function startOAuth(){
+  const appId=document.getElementById('appId').value.trim();
+  const appSecret=document.getElementById('appSecret').value.trim();
+  ewelinkRegion=document.getElementById('region').value;
+  if(!appId||!appSecret){setStatus('Ingresa tu AppID y AppSecret de dev.ewelink.cc','error');return}
+
+  // Save for later
+  try{localStorage.setItem('ewelink_oauth',JSON.stringify({appId,appSecret,region:ewelinkRegion}))}catch(e){}
+
+  const redirectUrl=`${PROXY_BASE}/api/callback`;
+  const state=generateNonce();
+  const seq=Date.now();
+  const nonce=generateNonce();
+
+  // eWeLink OAuth authorize URL
+  const authUrl=`https://c2ccdn.coolkit.cc/oauth/index.html?clientId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&grantType=authorization_code&state=${state}&nonce=${nonce}`;
+
+  setStatus('Abriendo ventana de login eWeLink...','info');
+  window.open(authUrl,'ewelink_auth','width=500,height=600');
+}
+
+// Listen for OAuth callback
+window.addEventListener('message',async function(event){
+  if(event.data&&event.data.type==='ewelink_auth'){
+    const code=event.data.code;
+    const region=event.data.region||ewelinkRegion;
+    if(region)ewelinkRegion=region;
+    setStatus('Código recibido, obteniendo token...','info');
+    await exchangeCodeForToken(code);
+  }
+});
+
+async function exchangeCodeForToken(code){
+  const saved=JSON.parse(localStorage.getItem('ewelink_oauth')||'{}');
+  const appId=saved.appId||document.getElementById('appId').value.trim();
+  const appSecret=saved.appSecret||document.getElementById('appSecret').value.trim();
+  const redirectUrl=`${PROXY_BASE}/api/callback`;
+
+  try{
+    const body={code,redirectUrl,grantType:'authorization_code'};
+    const nonce=generateNonce();
+    const r=await fetch(proxyUrl('/v2/user/oauth/token'),{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'X-CK-Appid':appId,
+        'X-CK-Nonce':nonce,
+        'Authorization':'Sign '+await hmacSign(appSecret,JSON.stringify(body))
+      },
+      body:JSON.stringify(body)
+    });
+    const data=await r.json();
+    if(data.error===0&&data.data?.at){
+      ewelinkToken=data.data.at;
+      ewelinkApiKey=data.data.user?.apikey;
+      try{localStorage.setItem('ewelink_config',JSON.stringify({region:ewelinkRegion,token:ewelinkToken,apiKey:ewelinkApiKey}))}catch(e){}
+      setStatus('✅ Conectado con eWeLink!','success');
+      document.getElementById('btnRefresh').style.display='inline-block';
+      await refreshDevices();
+    }else{
+      setStatus(`Error token: ${data.msg||JSON.stringify(data)}`,'error');
+    }
+  }catch(err){setStatus(`Error: ${err.message}`,'error')}
+}
+
+async function refreshDevices(){
+  if(!ewelinkToken){setStatus('No hay token','error');return}setStatus('Cargando dispositivos...','info');
+  try{
+    const r=await fetch(proxyUrl('/v2/device/thing?num=0&beginIndex=-1'),{headers:{'Content-Type':'application/json','Authorization':'Bearer '+ewelinkToken}});
+    const data=await r.json();
+    if(data.error===0&&data.data?.thingList){
+      ewelinkDevices=data.data.thingList.filter(t=>t.itemType===1||t.itemType===2).map(t=>({deviceId:t.itemData.deviceid,name:t.itemData.name,online:t.itemData.online,apikey:t.itemData.apikey,params:t.itemData.params||{}}));
+      renderDevicesList();document.getElementById('devicesSection').style.display='block';setStatus(`✅ ${ewelinkDevices.length} dispositivos`,'success');
+    }else setStatus(`Error: ${data.msg||data.error}`,'error');
+  }catch(err){setStatus(`Error: ${err.message}`,'error')}
+}
+
+function renderDevicesList(){
+  const list=document.getElementById('devicesList');list.innerHTML='';
+  ewelinkDevices.forEach(dev=>{
+    const sel=selectedDeviceIds.includes(dev.deviceId);const div=document.createElement('div');
+    div.className='device-item'+(sel?' selected':'');
+    div.innerHTML=`<div class="device-info"><div class="device-online ${dev.online?'on':''}"></div><div><div class="device-name">${dev.name}</div><div class="device-id">${dev.deviceId} · ${dev.online?'Online':'Offline'}</div></div></div><div class="device-toggle ${sel?'checked':''}" onclick="toggleDeviceSelect('${dev.deviceId}',this)"></div>`;
+    list.appendChild(div);
+  });
+}
+
+function toggleDeviceSelect(id,el){const i=selectedDeviceIds.indexOf(id);if(i>-1){selectedDeviceIds.splice(i,1);el.classList.remove('checked');el.closest('.device-item').classList.remove('selected')}else{selectedDeviceIds.push(id);el.classList.add('checked');el.closest('.device-item').classList.add('selected')}}
+
+function saveAndGo(){if(selectedDeviceIds.length===0){setStatus('Selecciona al menos 1','error');return}try{localStorage.setItem('ewelink_selected',JSON.stringify(selectedDeviceIds))}catch(e){}buildLightsPanel();switchTab('control')}
+
+function buildLightsPanel(){
+  const panel=document.getElementById('lightsPanel');panel.innerHTML='';
+  const sel=ewelinkDevices.filter(d=>selectedDeviceIds.includes(d.deviceId));
+  if(sel.length===0){panel.innerHTML='<div style="color:var(--dim);font-size:.85rem;text-align:center;padding:2rem">Sin dispositivos — prueba virtual</div>';buildVirtualLights();return}
+  sel.forEach(dev=>{const card=document.createElement('div');card.className='room-card';card.id='dev-'+dev.deviceId;card.innerHTML=`<div class="room-top"><span class="room-name">${dev.name}</span><div class="bulb-icon">💡</div></div><div class="room-bar"><div class="room-bar-fill"></div></div><div class="room-status">${dev.online?'READY':'OFFLINE'}</div>`;panel.appendChild(card)});
+  document.getElementById('ewelinkBadge').style.display='block';
+}
+
+function buildVirtualLights(){
+  const panel=document.getElementById('lightsPanel');
+  ['🛋️ Living','🛏️ Dormitorio','🍳 Cocina','💻 Oficina'].forEach((name,i)=>{
+    const card=document.createElement('div');card.className='room-card';card.id='vroom-'+i;
+    card.innerHTML=`<div class="room-top"><span class="room-name">${name}</span><div class="bulb-icon">💡</div></div><div class="room-bar"><div class="room-bar-fill"></div></div><div class="room-status">OFF</div>`;
+    panel.appendChild(card);
+  });
+}
+
+async function controlDevice(deviceId,switchState){
+  if(!ewelinkToken)return;
+  try{
+    const r=await fetch(proxyUrl('/v2/device/thing/status'),{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+ewelinkToken},body:JSON.stringify({type:1,id:deviceId,params:{switch:switchState}})});
+    const data=await r.json();const dev=ewelinkDevices.find(d=>d.deviceId===deviceId);
+    if(data.error===0)addLog(`${dev?.name||deviceId} → ${switchState.toUpperCase()}`,switchState==='on'?'on':'off');
+    else addLog(`Error ${deviceId}: ${data.msg||data.error}`,'err');
+  }catch(err){addLog(`Error ${deviceId}: ${err.message}`,'err')}
+}
+
+async function setAllDevices(state){
+  const now=Date.now();if(now-lastCommandTime<COMMAND_COOLDOWN)return;lastCommandTime=now;
+  const sw=state?'on':'off';
+  // Update all cards (virtual or real)
+  document.querySelectorAll('.room-card').forEach(card=>{
+    if(state){card.classList.add('on');card.querySelector('.room-status').textContent='ON'}
+    else{card.classList.remove('on');card.querySelector('.room-status').textContent='OFF'}
+  });
+  if(selectedDeviceIds.length>0&&ewelinkToken){
+    await Promise.allSettled(selectedDeviceIds.map(id=>controlDevice(id,sw)));
+  }
+}
+
+// ============================================================
+// Tab navigation
+// ============================================================
+function switchTab(tab){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+tab).classList.add('active');document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active')}
+
+// ============================================================
+// Hand Detection + Auto-Zoom
+// ============================================================
+const video=document.getElementById('webcam'),canvas=document.getElementById('canvas-main'),ctx=canvas.getContext('2d');
+const startBtn=document.getElementById('startBtn'),statusBadge=document.getElementById('statusBadge'),statusTextEl=document.getElementById('statusText');
+const loadingOverlay=document.getElementById('loadingOverlay'),zoomBadge=document.getElementById('zoomBadge'),zoomLevelEl=document.getElementById('zoomLevel');
+const leftEmoji=document.getElementById('leftEmoji'),leftState=document.getElementById('leftState');
+const rightEmoji=document.getElementById('rightEmoji'),rightState=document.getElementById('rightState');
+
+let cameraRunning=false,cameraObj=null,lightsOn=false,lastAction=null;
+let currentZoom={cx:.5,cy:.5,scale:1},targetZoom={cx:.5,cy:.5,scale:1};
+const ZOOM_SMOOTH=.08,ZOOM_PADDING=.35,MIN_ZOOM=1,MAX_ZOOM=3.5;
+const buffers={Left:[],Right:[]};const BUFFER_SIZE=6;
+
+const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`});
+hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:.6,minTrackingConfidence:.5});
+hands.onResults(onResults);
+
+function isFingerExtended(lm,f){const tips={index:8,middle:12,ring:16,pinky:20},pips={index:6,middle:10,ring:14,pinky:18};const w=lm[0],t=lm[tips[f]],p=lm[pips[f]];return Math.hypot(t.x-w.x,t.y-w.y)>Math.hypot(p.x-w.x,p.y-w.y)*1.05}
+function isThumbExtended(lm){const t=lm[4],m=lm[2],i=lm[3];return Math.hypot(t.x-m.x,t.y-m.y)>Math.hypot(i.x-m.x,i.y-m.y)*1.2}
+function detectGesture(lm){let e=0;for(const f of['index','middle','ring','pinky'])if(isFingerExtended(lm,f))e++;if(isThumbExtended(lm))e++;if(e>=4)return'open';if(e<=1)return'closed';return'partial'}
+function stableGesture(label,raw){buffers[label].push(raw);if(buffers[label].length>BUFFER_SIZE)buffers[label].shift();const c={open:0,closed:0,partial:0};buffers[label].forEach(g=>c[g]++);return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0]}
+function lerp(a,b,t){return a+(b-a)*t}
+
+function onResults(results){
+  const vw=video.videoWidth||640,vh=video.videoHeight||480;canvas.width=vw;canvas.height=vh;
+
+  // Audio processing each frame
+  processAudio();
+
+  if(results.multiHandLandmarks&&results.multiHandLandmarks.length>0){
+    let minX=1,maxX=0,minY=1,maxY=0;
+    for(const lm of results.multiHandLandmarks)for(const p of lm){if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y}
+    const cx=(minX+maxX)/2,cy=(minY+maxY)/2;let scale=1/(Math.max(maxX-minX,maxY-minY)+ZOOM_PADDING);
+    scale=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,scale));targetZoom={cx,cy,scale};zoomBadge.style.display='block';
+  }else{targetZoom={cx:.5,cy:.5,scale:1};zoomBadge.style.display='none'}
+
+  currentZoom.cx=lerp(currentZoom.cx,targetZoom.cx,ZOOM_SMOOTH);currentZoom.cy=lerp(currentZoom.cy,targetZoom.cy,ZOOM_SMOOTH);currentZoom.scale=lerp(currentZoom.scale,targetZoom.scale,ZOOM_SMOOTH);
+  zoomLevelEl.textContent=currentZoom.scale.toFixed(1);
+
+  const s=currentZoom.scale,srcW=vw/s,srcH=vh/s;
+  let srcX=currentZoom.cx*vw-srcW/2,srcY=currentZoom.cy*vh-srcH/2;
+  srcX=Math.max(0,Math.min(vw-srcW,srcX));srcY=Math.max(0,Math.min(vh-srcH,srcY));
+
+  ctx.save();ctx.translate(vw,0);ctx.scale(-1,1);ctx.drawImage(video,srcX,srcY,srcW,srcH,0,0,vw,vh);ctx.restore();
+
+  if(results.multiHandLandmarks){for(const lm of results.multiHandLandmarks){const norm=lm.map(p=>({x:1-((p.x*vw-srcX)/srcW),y:(p.y*vh-srcY)/srcH,z:p.z}));drawConnectors(ctx,norm,HAND_CONNECTIONS,{color:'rgba(251,191,36,.5)',lineWidth:2});drawLandmarks(ctx,norm,{color:'#fbbf24',lineWidth:1,radius:4})}}
+
+  let dL=null,dR=null;
+  if(results.multiHandLandmarks&&results.multiHandedness){for(let i=0;i<results.multiHandLandmarks.length;i++){const lm=results.multiHandLandmarks[i];const ul=results.multiHandedness[i].label==='Left'?'Right':'Left';const g=detectGesture(lm);const st=stableGesture(ul,g);if(ul==='Left')dL=st;else dR=st}}
+
+  updateHandUI('left',dL);updateHandUI('right',dR);
+
+  if(dL==='open'&&dR==='open'){if(lastAction!=='on'){lightsOn=true;lastAction='on';setAllDevices(true);addLog('🖐️🖐️ Ambas manos abiertas → ON','on')}}
+  else if(dL==='closed'&&dR==='closed'){if(lastAction!=='off'){lightsOn=false;lastAction='off';setAllDevices(false);addLog('✊✊ Ambos puños → OFF','off')}}
+}
+
+function updateHandUI(side,g){const emoji=side==='left'?leftEmoji:rightEmoji;const state=side==='left'?leftState:rightState;if(!g){emoji.textContent='❓';state.textContent='—';state.style.color='var(--dim)';return}if(g==='open'){emoji.textContent='🖐️';state.textContent='Abierta';state.style.color='var(--success)'}else if(g==='closed'){emoji.textContent='✊';state.textContent='Cerrada';state.style.color='var(--danger)'}else{emoji.textContent='🤚';state.textContent='Parcial';state.style.color='var(--accent)'}}
+
+async function toggleCamera(){
+  if(cameraRunning){
+    cameraObj.stop();cameraRunning=false;video.srcObject=null;ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(audioCtx){audioCtx.close();audioCtx=null;analyser=null}
+    startBtn.textContent='Iniciar Cámara + Mic';startBtn.classList.remove('running');statusBadge.classList.remove('active');statusTextEl.textContent='Inactivo';zoomBadge.style.display='none';
+    updateHandUI('left',null);updateHandUI('right',null);buffers.Left=[];buffers.Right=[];lastAction=null;
+    currentZoom={cx:.5,cy:.5,scale:1};targetZoom={cx:.5,cy:.5,scale:1};
+    document.getElementById('audioMeter').style.width='0%';
+    document.getElementById('clapDot1').classList.remove('hit');document.getElementById('clapDot2').classList.remove('hit');
+    clapTimes=[];return;
+  }
+
+  loadingOverlay.style.display='flex';startBtn.disabled=true;
+
+  try{
+    // Request both camera and microphone
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: { width: 640, height: 480 } });
+
+    // Init audio from the stream
+    initAudio(stream);
+
+    // Feed video to MediaPipe
+    cameraObj=new Camera(video,{onFrame:async()=>{await hands.send({image:video})},width:640,height:480});
+    await cameraObj.start();
+
+    cameraRunning=true;startBtn.textContent='Detener';startBtn.classList.add('running');startBtn.disabled=false;
+    statusBadge.classList.add('active');statusTextEl.textContent='Activo';loadingOverlay.style.display='none';
+
+    // Build virtual lights if no eWeLink devices selected
+    if(selectedDeviceIds.length===0&&document.querySelectorAll('.room-card').length===0) buildVirtualLights();
+
+  }catch(err){loadingOverlay.style.display='none';startBtn.disabled=false;alert('No se pudo acceder a cámara/micrófono. Da permisos.');console.error(err)}
+}
+
+// ============================================================
+// Init
+// ============================================================
+try{
+  const savedOAuth=JSON.parse(localStorage.getItem('ewelink_oauth')||'null');
+  if(savedOAuth){
+    if(savedOAuth.appId)document.getElementById('appId').value=savedOAuth.appId;
+    if(savedOAuth.appSecret)document.getElementById('appSecret').value=savedOAuth.appSecret;
+    if(savedOAuth.region){document.getElementById('region').value=savedOAuth.region;ewelinkRegion=savedOAuth.region}
+  }
+  const saved=JSON.parse(localStorage.getItem('ewelink_config')||'null');
+  if(saved){
+    if(saved.region){document.getElementById('region').value=saved.region;ewelinkRegion=saved.region}
+    if(saved.token){ewelinkToken=saved.token;ewelinkApiKey=saved.apiKey}
+  }
+  const sd=JSON.parse(localStorage.getItem('ewelink_selected')||'null');if(sd)selectedDeviceIds=sd;
+}catch(e){}
+</script>
+</body>
+</html>
